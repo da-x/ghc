@@ -484,6 +484,8 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %monad { P } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
 %tokentype { (Located Token) }
+%error { happyErrorExpList }
+%errorhandlertype explist
 
 -- Exported parsers
 %name parseModule module
@@ -3105,8 +3107,8 @@ maybe_docnext :: { Maybe LHsDocString }
         | {- empty -}                   { Nothing }
 
 {
-happyError :: P a
-happyError = srcParseFail
+happyErrorExpList :: (Located Token, [String]) -> P a
+happyErrorExpList (_, explist) = srcParseFail explist
 
 getVARID        (L _ (ITvarid    x)) = x
 getCONID        (L _ (ITconid    x)) = x

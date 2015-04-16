@@ -2181,7 +2181,7 @@ popContext = P $ \ s@(PState{ buffer = buf, dflags = flags, context = ctx,
                               last_len = len, last_loc = last_loc }) ->
   case ctx of
         (_:tl) -> POk s{ context = tl } ()
-        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr flags buf len)
+        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr flags buf len [])
 
 -- Push a new layout context at the indentation of the last token read.
 -- This is only used at the outer level of a module when the 'module'
@@ -2206,28 +2206,33 @@ srcParseErr
   :: DynFlags
   -> StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
+  -> [String]           -- list of possible tokens, in place of error
   -> MsgDoc
-srcParseErr dflags buf len
+srcParseErr dflags buf len explist
   = if null token
-         then ptext (sLit "parse error (possibly incorrect indentation or mismatched brackets)")
-         else ptext (sLit "parse error on input") <+> quotes (text token)
+         then ptext (sLit $ "parse error (possibly incorrect indentation or mismatched brackets)" ++ (explist_str ", "))
+         else ptext (sLit $ "parse error on input" ++ (explist_str ", ")) <+> quotes (text token)
               $$ ppWhen (not th_enabled && token == "$") -- #7396
-                        (text "Perhaps you intended to use TemplateHaskell")
+                        (text $ "Perhaps you intended to use TemplateHaskell" ++ (explist_str ", "))
               $$ ppWhen (token == "<-")
-                        (text "Perhaps this statement should be within a 'do' block?")
+                        (text ("Perhaps this statement should be within a 'do' block?" ++ explist_str " "))
               $$ ppWhen (token == "=")
-                        (text "Perhaps you need a 'let' in a 'do' block?"
+                        (text ("Perhaps you need a 'let' in a 'do' block?" ++ explist_str " ")
                          $$ text "e.g. 'let x = 5' instead of 'x = 5'")
   where token = lexemeToString (offsetBytes (-len) buf) len
         th_enabled = xopt Opt_TemplateHaskell dflags
+	explist_str sep =
+          case explist of
+            [] -> ""
+            ls -> sep ++ "possible tokens: " ++ (concat $ intersperse " " ls)
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
-srcParseFail :: P a
-srcParseFail = P $ \PState{ buffer = buf, dflags = flags, last_len = len,
+srcParseFail :: [String] -> P a
+srcParseFail explist = P $ \PState{ buffer = buf, dflags = flags, last_len = len,
                             last_loc = last_loc } ->
-    PFailed (RealSrcSpan last_loc) (srcParseErr flags buf len)
+    PFailed (RealSrcSpan last_loc) (srcParseErr flags buf len explist)
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.

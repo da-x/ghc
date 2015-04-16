@@ -1035,7 +1035,7 @@ isPtrGlobalReg (VanillaReg _ VGcPtr) = True
 isPtrGlobalReg _                     = False
 
 happyError :: P a
-happyError = srcParseFail
+happyError = srcParseFail []
 
 -- -----------------------------------------------------------------------------
 -- Statement-level macros
